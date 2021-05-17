@@ -22,7 +22,7 @@ namespace Simulator
     {
         public MainWindow()
         {
-            InitializeComponent();            
+            InitializeComponent();
         }
     }
 }

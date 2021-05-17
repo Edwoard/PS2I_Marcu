@@ -5,9 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Simulator"
         mc:Ignorable="d"
-        Title="MainWindow" Height="1080" Width="1920">
+        Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <local:MyControl Margin="-72,-63,72,63" >
+        <local:MyControl>
             
         </local:MyControl>
     </Grid>

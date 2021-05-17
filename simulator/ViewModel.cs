@@ -2,37 +2,233 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Simulator
 {
-    public enum ButtonState
-    { 
-        Off,
-        Request,
-        Blink,
-        Flash,
+    public enum State {  Stopped, On, Off }
+    public enum MixState { Stopped, Clockwise, CouterClockwise }
+    public record ProcessState
+    {
+        public State H1Manual { get; init; }
+        public State H2Substrace { get; init; }
+        public State H3Catalist { get; init; }
+        public State H4InertGaz { get; init; }
+
+        public int SupplyRate { get; init; }
+        public int DischargeRate { get; init; }
+
+        public State CoolantCircut { get; init; }
+        public State ProductValve { get; init; }
+
+        public MixState MixState { get; init; }
+
+        public bool LPlus { get; init; }
+        public bool LMinus { get; init; }
+
+        public override string ToString()
+        {
+            return JsonSerializer.Serialize(this, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Converters ={ new JsonStringEnumConverter() }
+            });
+        }
     }
 
-    public enum ProcessState
-    {
-        Off,
-        BlinkOn,
-        BlinkOff,     
-        AutoRed,
-        AutoYellow,
-        AutoGreen,         
-    }
-    
+
     class ViewModel : INotifyPropertyChanged
     {
+        public bool _isSendingData = true;
 
-        // foarte important in cadrul aplicatiilor de tip WPF este ca in view model sa fie implementata interfata INotifyPropertyChanged
-        // implementarea acestei interfete face ca atunci cand avem in codul xaml controale care fac bind pe anumite proprietati ale viewmodel-ului
-        // sa fie actualizate automat atunci cand proprietatiile pe care se face bind sunt actualizate in view model.
+        private Comm.Sender _sender = new Comm.Sender("127.0.0.1", 3000);
+        List<DelegateCommand> commands = new List<DelegateCommand>();
+        public void InvalidateCommands() => this.commands.ForEach(c => c.RaiseCanExecuteChanged());
+        public ViewModel()
+        {
+            this.SetManualModeCommand = new DelegateCommand(
+                executeHandler: async () => {
+                    this.ProcessState = this.ProcessState with { H1Manual = State.On };
+                    this.InvalidateCommands();
+                },
+                canExecuteHandler: () => this.ProcessState.H1Manual != State.On
+            );
+            this.commands.Add(this.SetManualModeCommand);
 
+            this.NeutralizeCommand = new DelegateCommand(
+                executeHandler: async () => {
+                    this.InvalidateCommands();
+                    await this.AddInertGas();
+                    await this.TryWaitForFillAndMixProduct();
+                    this.InvalidateCommands();
+                },
+                canExecuteHandler: () => 
+                    this.ProcessState.H4InertGaz == State.Stopped
+                    && this.ProcessState.H1Manual == State.On 
+                    && this.ProcessState.CoolantCircut == State.Stopped
+            );
+            this.commands.Add(this.NeutralizeCommand);
+
+            this.AddCatalistCommand = new DelegateCommand(
+                executeHandler: () => this.AddCatalist(),
+                canExecuteHandler: () => this.ProcessState.CoolantCircut == State.On && this.ProcessState.H3Catalist == State.Stopped
+            );
+            this.commands.Add(this.AddCatalistCommand);
+
+
+            this.AddSubstraceCommand = new DelegateCommand(
+                executeHandler: () => this.AddSubstrace(),
+                canExecuteHandler: () => this.ProcessState.CoolantCircut == State.On && this.ProcessState.H3Catalist == State.Stopped
+            );
+            this.commands.Add(this.AddSubstraceCommand);
+        }
+        public void SendData()
+        {
+            if (_isSendingData)
+            {
+                _sender.Send(Convert.ToByte(_currentStateOfTheProcess));
+            }
+        }
+
+        void AddCatalist()
+        {
+            this.ProcessState = this.ProcessState with
+            {
+                H3Catalist = State.On
+            };
+            this.InvalidateCommands();
+        }
+
+        void AddSubstrace()
+        {
+            this.ProcessState = this.ProcessState with
+            {
+                H2Substrace = State.On
+            };
+            this.InvalidateCommands();
+        }
+        async Task AddInertGas()
+        {
+            for (int i = 1; i < 10; i++)
+            {
+                this.ProcessState = this.ProcessState with { H4InertGaz = State.On };
+                await Task.Delay(500);
+                this.ProcessState = this.ProcessState with { H4InertGaz = State.Off };
+                await Task.Delay(500);
+            }
+            this.ProcessState = this.ProcessState with
+            {
+                H4InertGaz = State.Stopped,
+                CoolantCircut = State.On,
+            };
+            this.InvalidateCommands();
+        }
+
+        CancellationTokenSource cancelMixing = new CancellationTokenSource();
+
+        async Task TryWaitForFillAndMixProduct()
+        {
+            try
+            {
+                await this.WaitForFillAndMixProduct(cancelMixing.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                this.ProcessState = this.ProcessState with
+                {
+                    MixState = MixState.Stopped,
+                    H2Substrace = State.Stopped,
+                    H3Catalist = State.Stopped,
+                    ProductValve = State.Stopped
+                };
+            }
+        }
+        async Task WaitForFillAndMixProduct(CancellationToken cancellationToken)
+        {
+            while (!this.ProcessState.LPlus)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await Task.Delay(1);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                this.ProcessState = this.ProcessState with
+                {
+                    MixState = MixState.Clockwise
+                };
+                await Task.Delay(2000);
+                cancellationToken.ThrowIfCancellationRequested();
+                this.ProcessState = this.ProcessState with
+                {
+                    MixState = MixState.CouterClockwise
+                };
+                await Task.Delay(2000);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            this.ProcessState = this.ProcessState with
+            {
+                MixState = MixState.Clockwise
+            };
+            await Task.Delay(2000);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            this.ProcessState = this.ProcessState with
+            {
+                MixState = MixState.Stopped,
+                ProductValve = State.On
+            };
+            while (!this.ProcessState.LMinus)
+            {
+                await Task.Delay(1);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            this.ProcessState = this.ProcessState with
+            {
+                CoolantCircut = State.Stopped,
+                H2Substrace = State.Stopped,
+                H3Catalist = State.Stopped,
+                ProductValve = State.Stopped
+            };
+            this.InvalidateCommands();
+        }
+
+        //  de aici in jos este implementata partea de simulare a procesului
+        #region Simulator
+
+        private ProcessState _currentStateOfTheProcess = new ProcessState();
+        public ProcessState ProcessState
+        {
+            get => _currentStateOfTheProcess;
+            set => this.SetProperty(ref _currentStateOfTheProcess, value);
+        }
+        public DelegateCommand SetManualModeCommand { get; }
+        public DelegateCommand NeutralizeCommand { get; }
+        public DelegateCommand AddCatalistCommand { get; }
+        public DelegateCommand AddSubstraceCommand { get; }
+
+        public bool LPlus
+        {
+            get => this.ProcessState.LPlus;
+            set => this.ProcessState = this.ProcessState with { LPlus = value };
+        }
+
+        public bool LMinus
+        {
+            get => this.ProcessState.LMinus;
+            set => this.ProcessState = this.ProcessState with { LMinus = value };
+        }
+        #endregion
+
+
+        #region VM
         public event PropertyChangedEventHandler PropertyChanged;
         void OnPropertyChanged(string prop)
         {
@@ -40,314 +236,42 @@ namespace Simulator
                 this.PropertyChanged(this, new PropertyChangedEventArgs(prop));
         }
 
-        // acest flag este utilizat pentru a trimite date catre alte aplicatii, daca este setat pe true, iar daca este setat pe false face ca simulator sa functioneze ca o aplicatie simpla
-        // care nu comunica cu alte aplicatii
-        public bool _isSendingData = true;
-
-        // backgroundworker-ul si timer-ul sunt folosite pentru a simula procesul adica pentru a realiza o tranzitie intre anumite stari la anumite perioade de timp
-        private BackgroundWorker _worker = new BackgroundWorker();
-        private System.Timers.Timer _timer = new System.Timers.Timer();
-        
-        private Comm.Sender _sender;
-        private bool _setNextState = false;
-        private ProcessState _nextState;
-
-        public ViewModel() {}
-
-        public void SendData()
+        void SetProperty<T>(ref T field, T value, [CallerMemberName] string prop = null)
         {
-            if(_isSendingData)
+            if(!EqualityComparer<T>.Default.Equals(field, value))
             {
-                _sender.Send(Convert.ToByte(_currentStateOfTheProcess));
-            }
-        }
-
-
-        //  de aici in jos este implementata partea de simulare a procesului
-        #region Simulator
-        public void Init()
-        {
-            if(_isSendingData)
-            {
-                _sender = new Comm.Sender("127.0.0.1", 5500);
-            }
-            
-            _timer.Elapsed += _timer_Elapsed;
-            _worker.DoWork += _worker_DoWork;
-            _worker.RunWorkerAsync();
-        }
-
-        private ProcessState _currentStateOfTheProcess = ProcessState.Off;
-        public ProcessState CurrentStateOfTheProcess
-        {
-            get => _currentStateOfTheProcess;
-            set
-            {
-                // urmatoarele doua linii de cod opresc timerul deoarece a avut loc o tranzitie de stare
-                _setNextState = false;
-                _timer.Stop();
-
-                // dupa care se actualizeaza starea curenta si se trimit actualizarile de stare mai departe
-                _currentStateOfTheProcess = value;
-                SendData();
-            }
-        }
-
-        private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            CurrentStateOfTheProcess = _nextState;
-        }
-
-        private void RaiseTimerEvent(ProcessState NextStateOfTheProcess, int TimeInterval)
-        {
-            if(!_setNextState)
-            {
-                _setNextState = true;
-                _nextState = NextStateOfTheProcess;
-                _timer.Interval = TimeInterval;
-                _timer.Start();
-            }
-        }
-
-        private void _worker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            // idea de baza a simulatorului este urmatoarea: backgroundworker-ul evalueza tot la 100 de milisecunde starea curenta a procesului 
-            // si seteaza in viewmodel variabilele care actualizeaza UI-ul dupa care utilizand RaiseTimerEvent(NextProcessState, 2000) determina o tranzitie de stare peste un
-            // interval de timp specificat de al doilea paramteru al acestei metode
-
-            while (true)
-            {              
-                ProcessNextState(CurrentStateOfTheProcess);
-                System.Threading.Thread.Sleep(100);
-            }
-        }
-
-        // aceasta metoda proceseaza starea curenta, in funtie de valoarea acesteia seteaza anumite variabile care actualizeaza UI-ul 
-        // si utilizand metoda RaiseTimerEvent(NextState, 2000) declanseaza o tranzitie viitoare de stare
-        public void ProcessNextState(ProcessState CurrentState)
-        {
-            switch (CurrentState)
-            {
-                case ProcessState.Off:
-                    IsRedForCar = false;
-                    IsYellowForCar = false;
-                    IsGreenForCar = false;
-                    IsRedForPeople = false;
-                    IsGreenForPeople = false;
-
-                    RaiseTimerEvent(ProcessState.Off, 2000);
-                   
-                    break;
-                case ProcessState.BlinkOn:
-                    IsRedForCar = false;
-                    IsYellowForCar = true;
-                    IsGreenForCar = false;
-                    IsRedForPeople = false;
-                    IsGreenForPeople = false;
-
-                    RaiseTimerEvent(ProcessState.BlinkOff, 2000);
-
-                    break;
-                case ProcessState.BlinkOff:
-                    IsRedForCar = false;
-                    IsYellowForCar = false;
-                    IsGreenForCar = false;
-                    IsRedForPeople = false;
-                    IsGreenForPeople = false;
-                    
-                    RaiseTimerEvent(ProcessState.BlinkOn, 2000);
-                   
-                    break;               
-                case ProcessState.AutoRed:
-                    IsRedForCar = true;
-                    IsYellowForCar = false;
-                    IsGreenForCar = false;
-                    IsRedForPeople = false;
-                    IsGreenForPeople = true;
-
-                    RaiseTimerEvent(ProcessState.AutoGreen, 5000);
-
-                    break;
-                case ProcessState.AutoYellow:
-                    IsRedForCar = false;
-                    IsYellowForCar = true;
-                    IsGreenForCar = false;
-                    IsRedForPeople = true;
-                    IsGreenForPeople = false;
-                    
-                    RaiseTimerEvent(ProcessState.AutoRed, 3000);
-
-                    break;
-                case ProcessState.AutoGreen:
-                    IsRedForCar = false;
-                    IsYellowForCar = false;
-                    IsGreenForCar = true;
-                    IsRedForPeople = true;
-                    IsGreenForPeople = false;
-
-                    RaiseTimerEvent(ProcessState.AutoYellow, 10000);
-
-                    break;                              
-            }
-
-        }
-
-        // aceasta metoda este apelata direct de pe UI, pentru a forta o tranzitie de stare a procesului
-        // tranzitia de stare forteaza oprirea timer-ului care ar trebui sa declanseze urmatoarea tranzitie de stare
-        // si seteaza ca si stare curenta starea primita ca si parametru
-        // dupa care backgroundworker-ul o sa se ocupe de tot si va declansa urmatoarea tranzitie de stare care urmeaza
-        public void ForceNextState(ProcessState NextState)
-        {
-            CurrentStateOfTheProcess = NextState;
-        }
-        #endregion
-
-        // de aici in jos sunt proprietatiile pe care le folosim pentru a actualiza UI-ul
-        #region UI_updates
-        private bool _isRedForCar;
-        public bool IsRedForCar 
-        {
-            get
-            {
-                return _isRedForCar;
-            }
-            set
-            {
-                _isRedForCar = value;
-                OnPropertyChanged(nameof(IsRedForCarsVisible));
-            }
-        }
-
-        public System.Windows.Visibility IsRedForCarsVisible
-        {
-            get
-            {
-                if(_isRedForCar)
-                {
-                    return System.Windows.Visibility.Visible;
-                }
-                else
-                {
-                    return System.Windows.Visibility.Hidden;
-                }
-            }
-        }
-
-        private bool _isYellowForCar;
-        public bool IsYellowForCar
-        {
-            get
-            {
-                return _isYellowForCar;
-            }
-            set
-            {
-                _isYellowForCar = value;
-                OnPropertyChanged(nameof(IsYellowForCarsVisible));
-            }
-        }
-
-        public System.Windows.Visibility IsYellowForCarsVisible
-        {
-            get
-            {
-                if (_isYellowForCar)
-                {
-                    return System.Windows.Visibility.Visible;
-                }
-                else
-                {
-                    return System.Windows.Visibility.Hidden;
-                }
-            }
-        }
-
-        private bool _isGreenForCar;
-        public bool IsGreenForCar
-        {
-            get
-            {
-                return _isGreenForCar;
-            }
-            set
-            {
-                _isGreenForCar = value;
-                OnPropertyChanged(nameof(IsGreenForCarsVisible));
-            }
-        }
-
-        public System.Windows.Visibility IsGreenForCarsVisible
-        {
-            get
-            {
-                if (_isGreenForCar)
-                {
-                    return System.Windows.Visibility.Visible;
-                }
-                else
-                {
-                    return System.Windows.Visibility.Hidden;
-                }
-            }
-        }
-
-        private bool _isGreenForPeople;
-        public bool IsGreenForPeople
-        {
-            get
-            {
-                return _isGreenForPeople;
-            }
-            set
-            {
-                _isGreenForPeople = value;
-                OnPropertyChanged(nameof(IsGreenForPeopleVisible));
-            }
-        }
-
-        public System.Windows.Visibility IsGreenForPeopleVisible
-        {
-            get
-            {
-                if (_isGreenForPeople)
-                {
-                    return System.Windows.Visibility.Visible;
-                }
-                else
-                {
-                    return System.Windows.Visibility.Hidden;
-                }
-            }
-        }
-
-        private bool _isRedForPeople;
-        public bool IsRedForPeople
-        {
-            get
-            {
-                return _isRedForPeople;
-            }
-            set
-            {
-                _isRedForPeople = value;
-                OnPropertyChanged(nameof(IsRedForPeopleVisible));
-            }
-        }
-
-        public System.Windows.Visibility IsRedForPeopleVisible
-        {
-            get
-            {
-                if (_isRedForPeople)
-                {
-                    return System.Windows.Visibility.Visible;
-                }
-                else
-                {
-                    return System.Windows.Visibility.Hidden;
-                }
+                field = value;
+                OnPropertyChanged(prop);
             }
         }
         #endregion
+    }
+
+    public class DelegateCommand : ICommand
+    {
+        private readonly Func<bool> canExecuteHandler;
+        private readonly Action executeHandler;
+
+        public DelegateCommand(Action executeHandler, Func<bool> canExecuteHandler = null)
+        {
+            this.canExecuteHandler = canExecuteHandler;
+            this.executeHandler = executeHandler;
+        }
+        public event EventHandler CanExecuteChanged;
+
+        public void RaiseCanExecuteChanged()
+        {
+            this.CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return this.canExecuteHandler?.Invoke() ?? true;
+        }
+
+        public void Execute(object parameter)
+        {
+            this.executeHandler();
+        }
     }
 }
