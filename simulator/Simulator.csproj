@@ -6,4 +6,24 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="img\clock-arrow.png" />
+    <None Remove="img\counter-clock-arrow.png" />
+    <None Remove="img\down-arrow.png" />
+    <None Remove="img\top-left-bottom-right-arrow.png" />
+    <None Remove="img\top-right-bottom-left.png" />
+    <None Remove="img\up-arrow.png" />
+    <None Remove="img\water.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="img\clock-arrow.png" />
+    <Resource Include="img\counter-clock-arrow.png" />
+    <Resource Include="img\down-arrow.png" />
+    <Resource Include="img\top-left-bottom-right-arrow.png" />
+    <Resource Include="img\top-right-bottom-left.png" />
+    <Resource Include="img\up-arrow.png" />
+    <Resource Include="img\water.png" />
+  </ItemGroup>
+
 </Project>

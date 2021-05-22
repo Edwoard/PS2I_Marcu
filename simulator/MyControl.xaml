@@ -4,17 +4,161 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:Simulator"
-             mc:Ignorable="d" 
+             mc:Ignorable="d" MinHeight="600"
              d:DataContext="{x:Type local:ViewModel}"
-             d:DesignHeight="1080" d:DesignWidth="1920">
-    <StackPanel>
-        <Button Command="{Binding AbortCommand}">S0 - Abort</Button>
-        <Button Command="{Binding SetManualModeCommand}">S1 - Start - Manual</Button>
-        <Button Command="{Binding AddSubstraceCommand}">S2 - Add Substrace</Button>
-        <Button Command="{Binding AddCatalistCommand}">S3- Add Catalist</Button>
-        <Button Command="{Binding NeutralizeCommand}">S4 - Neutralize</Button>
-        <CheckBox Content="L+" IsChecked="{Binding LPlus}"></CheckBox>
-        <CheckBox Content="L-" IsChecked="{Binding LMinus}"></CheckBox>
-        <Label Content="{Binding ProcessState}"></Label>
-    </StackPanel>
+             d:DesignHeight="1080" d:DesignWidth="800">
+    <UserControl.Resources>
+        <local:LedStateConverter x:Key="ledState"></local:LedStateConverter>
+        <local:ClockwiseStateConverter x:Key="clockState"></local:ClockwiseStateConverter>
+        <local:CounterClockwiseStateConverter x:Key="counterClockState"></local:CounterClockwiseStateConverter>
+        <local:BoolConverter x:Key="boolConv"></local:BoolConverter>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+            <ColumnDefinition Width="200px"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid TextBlock.FontSize="20" TextBlock.FontWeight="Bold"
+              Grid.Column="0" Width="500" Height="600" VerticalAlignment="Top" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"></ColumnDefinition>
+                <ColumnDefinition Width="*"></ColumnDefinition>
+                <ColumnDefinition Width="*"></ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition></RowDefinition>
+                <RowDefinition Height="2*"></RowDefinition>
+                <RowDefinition></RowDefinition>
+            </Grid.RowDefinitions>
+            <Image Grid.Row="1" Grid.Column="2" Margin="-50,0,50,0" 
+                   Visibility="{Binding ProcessState.CoolantCircut, Converter={StaticResource ledState}}"
+                   Source="./img/water.png"></Image>
+
+            <Label Grid.Row="1" Grid.Column="2" 
+                   VerticalAlignment="Center" HorizontalAlignment="Left"
+                   Content="Water Circut" ></Label>
+            <Border Grid.Row="1" Grid.Column="1" 
+                    CornerRadius="30"
+                    Background="White"
+                    BorderThickness="4" BorderBrush="Black"></Border>
+
+            <Image Grid.Row="2" Grid.Column="1"
+                   Margin="0,-30,0,30"
+                   Visibility="{Binding ProcessState.ProductValve, Converter={StaticResource ledState}}"
+                   Source="./img/down-arrow.png"></Image>
+            <Label Grid.Row="2" Grid.Column="1" 
+                   VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                   Content="Evacuation" ></Label>
+
+            <Image Grid.Row="0" Grid.Column="0" 
+                   Margin="0,30,0,-30"
+                   Visibility="{Binding ProcessState.H4InertGaz, Converter={StaticResource ledState}}"
+                   Source="./img/top-left-bottom-right-arrow.png"></Image>
+            <Label Grid.Row="0" Grid.Column="0" Content="Inert Gas" ></Label>
+            
+            <Image Grid.Row="0" Grid.Column="2" 
+                   Margin="0,30,0,-30"
+                   Visibility="{Binding ProcessState.H3Catalist, Converter={StaticResource ledState}}"
+                   Source="./img/top-right-bottom-left.png"></Image>
+            <Label Grid.Row="0" Grid.Column="2" 
+                   HorizontalAlignment="Right"
+                   Content="Catalist" ></Label>
+            
+            <Image Grid.Row="0" Grid.Column="1" 
+                   Margin="0,30,0,-30"
+                   Visibility="{Binding ProcessState.H2Substrace, Converter={StaticResource ledState}}"
+                   Source="./img/down-arrow.png"></Image>
+            <Label Grid.Row="0" Grid.Column="1" Content="Substrance"
+                   HorizontalAlignment="Center"></Label>
+            <Image Grid.Column="1" Grid.Row="1"
+                   Margin="10"
+                   Visibility="{Binding ProcessState.MixState, Converter={StaticResource counterClockState}}"
+                   Source="./img/counter-clock-arrow.png"></Image>
+            <Image Grid.Column="1" Grid.Row="1"
+                   Margin="10"
+                   Visibility="{Binding ProcessState.MixState, Converter={StaticResource clockState}}"
+                   Source="./img/clock-arrow.png"></Image>
+            <Grid Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,50,0,0">
+                <Border Visibility="{Binding ProcessState.LPlus, Converter={StaticResource boolConv}}"
+                        Background="Red" Width="50" Height="50" CornerRadius="25">
+                
+                </Border>
+                <Border BorderBrush="Black" BorderThickness="1" Width="50" Height="50" CornerRadius="25"></Border>
+                <Label Content="L+" HorizontalAlignment="Center" VerticalAlignment="Center"></Label>
+            </Grid>
+            <Grid Grid.Row="1" Grid.Column="0" VerticalAlignment="Bottom" Margin="0,0,0,20">
+                <Border Visibility="{Binding ProcessState.LMinus, Converter={StaticResource boolConv}}"
+                        Background="Red" Width="50" Height="50" CornerRadius="25">
+
+                </Border>
+                <Border BorderBrush="Black" BorderThickness="1" Width="50" Height="50" CornerRadius="25"></Border>
+                <Label Content="L-" HorizontalAlignment="Center" VerticalAlignment="Center"></Label>
+            </Grid>
+        </Grid>
+        <Grid Grid.Column="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="50px"></ColumnDefinition>
+                <ColumnDefinition Width="150px"></ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+            </Grid.RowDefinitions>
+            <Button Grid.Row="0" Grid.Column="1" Margin="4" Command="{Binding AbortCommand}">S0 - Abort</Button>
+            
+            <Button Grid.Row="1" Grid.Column="1" Margin="4" Command="{Binding SetManualModeCommand}">S1 - Start - Manual</Button>
+            <Border Visibility="{Binding ProcessState.H1Manual, Converter={StaticResource ledState}}" 
+                    Grid.Row="1" CornerRadius="15" Margin="4"
+                    Height="30" Width="30" Background="Red"></Border>
+            
+            <Button Grid.Row="2" Grid.Column="1" Margin="4" Command="{Binding AddSubstraceCommand}">S2 - Add Substrace</Button>
+            <Border Visibility="{Binding ProcessState.H2Substrace, Converter={StaticResource ledState}}" 
+                    Grid.Row="2" CornerRadius="15" Margin="4"
+                    Height="30" Width="30" Background="Red"></Border>
+            
+            <Button Grid.Row="3" Grid.Column="1" Margin="4" Command="{Binding AddCatalistCommand}">S3- Add Catalist</Button>
+            <Border Visibility="{Binding ProcessState.H3Catalist, Converter={StaticResource ledState}}" 
+                    Grid.Row="3" CornerRadius="15" Margin="4"
+                    Height="30" Width="30" Background="Red"></Border>
+            
+            <Button Grid.Row="4" Grid.Column="1" Margin="4" Command="{Binding NeutralizeCommand}">S4 - Neutralize</Button>
+            <Border Visibility="{Binding ProcessState.H4InertGaz, Converter={StaticResource ledState}}" 
+                    Grid.Row="4" CornerRadius="15" Margin="4"
+                    Height="30" Width="30" Background="Red"></Border>
+            
+            <Button Grid.Row="5" Grid.Column="1" Margin="4" Command="{Binding SetAutoCommand}">S5 - Auto</Button>
+            <Border Visibility="{Binding ProcessState.H5AutoMode, Converter={StaticResource ledState}}" 
+                    Grid.Row="5" CornerRadius="15" Margin="4" 
+                    Height="30" Width="30" Background="Red"></Border>
+            
+            <Button Grid.Row="6" Grid.Column="1" Margin="4" Command="{Binding WaterCoolantErrorCommand}">S11 - WaterCoolantError</Button>
+            
+
+            <StackPanel Grid.Row="7" Margin="25" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                <CheckBox  Content="L+" IsChecked="{Binding LPlus}"></CheckBox>
+                <CheckBox Grid.Row="8" Content="L-" IsChecked="{Binding LMinus}"></CheckBox>
+            </StackPanel>
+
+            <StackPanel Grid.Row="8" Grid.ColumnSpan="2">
+                <Label>Supply Rate</Label>
+                <Slider Minimum="0" Maximum="100" Value="{Binding SupplyRate}"></Slider>
+            </StackPanel>
+
+            <StackPanel Grid.Row="9" Grid.ColumnSpan="2">
+                <Label>Discharge Rate</Label>
+                <Slider Minimum="0" Maximum="100" Value="{Binding DischargeRate}"></Slider>
+            </StackPanel>
+            <Label Grid.Row="10" Height="250px" Grid.ColumnSpan="2" Content="{Binding ProcessState}"></Label>
+        </Grid>
+
+    </Grid>
 </UserControl>

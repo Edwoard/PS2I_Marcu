@@ -21,15 +21,17 @@ namespace Simulator
         public State H2Substrace { get; init; }
         public State H3Catalist { get; init; }
         public State H4InertGaz { get; init; }
+        public State H5AutoMode { get; init; }
 
-        public int SupplyRate { get; init; }
-        public int DischargeRate { get; init; }
+        public int SupplyRate { get; init; } = 50;
+        public int DischargeRate { get; init; } = 50;
 
         public State CoolantCircut { get; init; }
         public State ProductValve { get; init; }
 
         public MixState MixState { get; init; }
 
+        public bool IsNewtralised { get; init; }
         public bool LPlus { get; init; }
         public bool LMinus { get; init; }
 
@@ -48,62 +50,99 @@ namespace Simulator
     {
         public bool _isSendingData = true;
 
-        private Comm.Sender _sender = new Comm.Sender("127.0.0.1", 3000);
+        private Comm.Sender _sender = new Comm.Sender("127.0.0.1", 5500);
         List<DelegateCommand> commands = new List<DelegateCommand>();
         public void InvalidateCommands() => this.commands.ForEach(c => c.RaiseCanExecuteChanged());
+
+        public bool IsManualOrAuto => this.ProcessState.H1Manual == State.On || this.ProcessState.H5AutoMode == State.On;
         public ViewModel()
         {
+            this.WaterCoolantErrorCommand = new DelegateCommand(
+                executeHandler: () => this.WaterCoolantError(),
+                canExecuteHandler: () => this.IsManualOrAuto
+            );
+            this.commands.Add(this.WaterCoolantErrorCommand);
+
+            this.AbortCommand = new DelegateCommand(
+                executeHandler: () => this.AbortProcess(),
+                canExecuteHandler: () => this.cancelProcess != null
+            );
+            this.commands.Add(this.AbortCommand);
+
             this.SetManualModeCommand = new DelegateCommand(
-                executeHandler: async () => {
-                    this.ProcessState = this.ProcessState with { H1Manual = State.On };
-                    this.InvalidateCommands();
+                executeHandler: () =>
+                {
+                    this.ProcessState = this.ResetProcessState() with
+                    { 
+                        H1Manual = State.On,
+                    };
                 },
                 canExecuteHandler: () => this.ProcessState.H1Manual != State.On
             );
             this.commands.Add(this.SetManualModeCommand);
 
-            this.NeutralizeCommand = new DelegateCommand(
-                executeHandler: async () => {
-                    this.InvalidateCommands();
-                    await this.AddInertGas();
-                    await this.TryWaitForFillAndMixProduct();
-                    this.InvalidateCommands();
+            this.SetAutoCommand = new DelegateCommand(
+                executeHandler: () => 
+                {
+                    this.ProcessState = this.ResetProcessState() with 
+                    { 
+                        H5AutoMode = State.On 
+                    };
                 },
+                canExecuteHandler: () => this.ProcessState.H5AutoMode != State.On
+            );
+            this.commands.Add(this.SetAutoCommand);
+
+            this.NeutralizeCommand = new DelegateCommand(
+                executeHandler: () => this.currentProcessTask = this.TryStartProcess(),
                 canExecuteHandler: () => 
                     this.ProcessState.H4InertGaz == State.Stopped
-                    && this.ProcessState.H1Manual == State.On 
-                    && this.ProcessState.CoolantCircut == State.Stopped
+                    && this.IsManualOrAuto
+                    && !this.ProcessState.IsNewtralised
             );
             this.commands.Add(this.NeutralizeCommand);
 
             this.AddCatalistCommand = new DelegateCommand(
                 executeHandler: () => this.AddCatalist(),
-                canExecuteHandler: () => this.ProcessState.CoolantCircut == State.On && this.ProcessState.H3Catalist == State.Stopped
+                canExecuteHandler: () => 
+                    this.ProcessState.IsNewtralised
+                    && this.ProcessState.CoolantCircut == State.On 
+                    && this.ProcessState.H3Catalist == State.Stopped
             );
             this.commands.Add(this.AddCatalistCommand);
 
 
             this.AddSubstraceCommand = new DelegateCommand(
                 executeHandler: () => this.AddSubstrace(),
-                canExecuteHandler: () => this.ProcessState.CoolantCircut == State.On && this.ProcessState.H3Catalist == State.Stopped
+                canExecuteHandler: () =>
+                    this.ProcessState.IsNewtralised
+                    && this.ProcessState.CoolantCircut == State.On 
+                    && this.ProcessState.H2Substrace == State.Stopped
             );
             this.commands.Add(this.AddSubstraceCommand);
         }
-        public void SendData()
-        {
-            if (_isSendingData)
-            {
-                _sender.Send(Convert.ToByte(_currentStateOfTheProcess));
-            }
-        }
 
+        ProcessState ResetProcessState()
+        {
+            return this.ProcessState with
+            {
+                CoolantCircut = State.Stopped,
+                H1Manual = State.Stopped,
+                H5AutoMode = State.Stopped,
+                MixState = MixState.Stopped,
+                H2Substrace = State.Stopped,
+                H3Catalist = State.Stopped,
+                ProductValve = State.Stopped,
+                H4InertGaz = State.Stopped,
+                IsNewtralised = false
+            };
+        }
         void AddCatalist()
         {
             this.ProcessState = this.ProcessState with
             {
                 H3Catalist = State.On
             };
-            this.InvalidateCommands();
         }
 
         void AddSubstrace()
@@ -112,43 +151,67 @@ namespace Simulator
             {
                 H2Substrace = State.On
             };
-            this.InvalidateCommands();
         }
-        async Task AddInertGas()
+        async Task AddInertGas(CancellationToken cancellationToken)
         {
             for (int i = 1; i < 10; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 this.ProcessState = this.ProcessState with { H4InertGaz = State.On };
                 await Task.Delay(500);
+
+                cancellationToken.ThrowIfCancellationRequested();
                 this.ProcessState = this.ProcessState with { H4InertGaz = State.Off };
                 await Task.Delay(500);
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
             this.ProcessState = this.ProcessState with
             {
                 H4InertGaz = State.Stopped,
                 CoolantCircut = State.On,
+                IsNewtralised = true,
             };
-            this.InvalidateCommands();
         }
 
-        CancellationTokenSource cancelMixing = new CancellationTokenSource();
+        CancellationTokenSource cancelProcess;
 
-        async Task TryWaitForFillAndMixProduct()
+        async void WaterCoolantError()
+        {
+            this.AbortProcess();
+            await this.currentProcessTask;
+            this.ProcessState = this.ProcessState with
+            {
+                ProductValve = State.On,
+                CoolantCircut = State.Stopped
+            };
+        }
+        void AbortProcess()
+        {
+            cancelProcess?.Cancel();
+        }
+        Task currentProcessTask;
+        async Task TryStartProcess()
         {
             try
             {
-                await this.WaitForFillAndMixProduct(cancelMixing.Token);
+                cancelProcess = new CancellationTokenSource();
+                await this.AddInertGas(cancelProcess.Token);
+                if(this.ProcessState.H5AutoMode == State.On)
+                {
+                    this.AddCatalist();
+                    this.AddSubstrace();
+                }
+                await this.WaitForFillAndMixProduct(cancelProcess.Token);
             }
             catch (OperationCanceledException)
             {
-                this.ProcessState = this.ProcessState with
+                this.ProcessState = this.ResetProcessState() with
                 {
-                    MixState = MixState.Stopped,
-                    H2Substrace = State.Stopped,
-                    H3Catalist = State.Stopped,
-                    ProductValve = State.Stopped
+                    CoolantCircut = State.On,
                 };
             }
+            cancelProcess = null;
         }
         async Task WaitForFillAndMixProduct(CancellationToken cancellationToken)
         {
@@ -190,14 +253,7 @@ namespace Simulator
                 await Task.Delay(1);
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            this.ProcessState = this.ProcessState with
-            {
-                CoolantCircut = State.Stopped,
-                H2Substrace = State.Stopped,
-                H3Catalist = State.Stopped,
-                ProductValve = State.Stopped
-            };
-            this.InvalidateCommands();
+            this.ProcessState = this.ResetProcessState();
         }
 
         //  de aici in jos este implementata partea de simulare a procesului
@@ -207,9 +263,17 @@ namespace Simulator
         public ProcessState ProcessState
         {
             get => _currentStateOfTheProcess;
-            set => this.SetProperty(ref _currentStateOfTheProcess, value);
+            set
+            {
+                this.SetProperty(ref _currentStateOfTheProcess, value);
+                this.InvalidateCommands();
+                this._sender.Send(_currentStateOfTheProcess.ToString());
+            }
         }
+
+        public DelegateCommand AbortCommand { get; }
         public DelegateCommand SetManualModeCommand { get; }
+        public DelegateCommand SetAutoCommand { get; }
         public DelegateCommand NeutralizeCommand { get; }
         public DelegateCommand AddCatalistCommand { get; }
         public DelegateCommand AddSubstraceCommand { get; }
@@ -225,6 +289,20 @@ namespace Simulator
             get => this.ProcessState.LMinus;
             set => this.ProcessState = this.ProcessState with { LMinus = value };
         }
+
+        public int DischargeRate
+        {
+            get => this.ProcessState.DischargeRate;
+            set => this.ProcessState = this.ProcessState with { DischargeRate = value };
+        }
+
+
+        public int SupplyRate
+        {
+            get => this.ProcessState.SupplyRate;
+            set => this.ProcessState = this.ProcessState with { SupplyRate = value };
+        }
+        public DelegateCommand WaterCoolantErrorCommand { get; }
         #endregion
 
 

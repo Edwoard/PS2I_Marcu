@@ -14,15 +14,16 @@ let tcpServer = net.createServer(function (sock) {
   //Add a 'data' event handler to this instance of socket
   //data[] is the 
   sock.on('data', function (data) {
-    console.log('DATA ' + sock.remoteAddress + ': ' + sock.bytesRead + ' ---> data read:  ' + data[0].toString() + ' ' + data[1].toString());
-    // Emitting to all clients
-    io.emit("FromAPI", data[0]); 
+    console.log('DATA ' + sock.remoteAddress + ': ' + sock.bytesRead + ' ---> data read:  ' + data.toString('utf-8'));
+    io.emit("FromAPI", data.toString("utf-8")); 
   });
 
   sock.on('close', function (data) {
     console.log('CLOSED: ' + sock.remoteAddress + ' ' + sock.remotePort);
   });
-
+  sock.on('error', function (e) {
+    console.log('Error: ', e);
+  })
 })
 
 tcpServer.listen(PORT, HOST);

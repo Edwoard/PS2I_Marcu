@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.Text;
 
 namespace Comm
 {
@@ -14,20 +15,19 @@ namespace Comm
             ipAddress = IpAddress;
             portNumber = PortNumber;
         }
-		public void Send(byte ValueToSend)
+		public void Send(string ValueToSend)
 		{
-			try
-			{
-				_sender = _sender ?? new TcpClient(ipAddress, portNumber);
-				NetworkStream nwStream = _sender.GetStream();
-				byte[] bytesToSend = new byte[4];
-				bytesToSend[0] = ValueToSend;
-				nwStream.Write(bytesToSend, 0, bytesToSend.Length);				
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.ToString());
-			}
+			//try
+			//{
+			//	_sender = _sender ?? new TcpClient(ipAddress, portNumber);
+			//	NetworkStream nwStream = _sender.GetStream();
+			//	var data = Encoding.UTF8.GetBytes(ValueToSend);
+			//	nwStream.Write(data, 0, data.Length);				
+			//}
+			//catch (Exception ex)
+			//{
+			//	Console.WriteLine(ex.ToString());
+			//}
 		}
 	}
 }
