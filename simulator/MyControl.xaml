@@ -58,7 +58,7 @@
             
             <Image Grid.Row="0" Grid.Column="2" 
                    Margin="0,30,0,-30"
-                   Visibility="{Binding ProcessState.H3Catalist, Converter={StaticResource ledState}}"
+                   Visibility="{Binding ProcessState.H3Catalyst, Converter={StaticResource ledState}}"
                    Source="./img/top-right-bottom-left.png"></Image>
             <Label Grid.Row="0" Grid.Column="2" 
                    HorizontalAlignment="Right"
@@ -66,7 +66,7 @@
             
             <Image Grid.Row="0" Grid.Column="1" 
                    Margin="0,30,0,-30"
-                   Visibility="{Binding ProcessState.H2Substrace, Converter={StaticResource ledState}}"
+                   Visibility="{Binding ProcessState.H2Substance, Converter={StaticResource ledState}}"
                    Source="./img/down-arrow.png"></Image>
             <Label Grid.Row="0" Grid.Column="1" Content="Substrance"
                    HorizontalAlignment="Center"></Label>
@@ -121,12 +121,12 @@
                     Height="30" Width="30" Background="Red"></Border>
             
             <Button Grid.Row="2" Grid.Column="1" Margin="4" Command="{Binding AddSubstraceCommand}">S2 - Add Substrace</Button>
-            <Border Visibility="{Binding ProcessState.H2Substrace, Converter={StaticResource ledState}}" 
+            <Border Visibility="{Binding ProcessState.H2Substance, Converter={StaticResource ledState}}" 
                     Grid.Row="2" CornerRadius="15" Margin="4"
                     Height="30" Width="30" Background="Red"></Border>
             
             <Button Grid.Row="3" Grid.Column="1" Margin="4" Command="{Binding AddCatalistCommand}">S3- Add Catalist</Button>
-            <Border Visibility="{Binding ProcessState.H3Catalist, Converter={StaticResource ledState}}" 
+            <Border Visibility="{Binding ProcessState.H3Catalyst, Converter={StaticResource ledState}}" 
                     Grid.Row="3" CornerRadius="15" Margin="4"
                     Height="30" Width="30" Background="Red"></Border>
             

@@ -17,17 +17,17 @@ namespace Comm
         }
 		public void Send(string ValueToSend)
 		{
-			//try
-			//{
-			//	_sender = _sender ?? new TcpClient(ipAddress, portNumber);
-			//	NetworkStream nwStream = _sender.GetStream();
-			//	var data = Encoding.UTF8.GetBytes(ValueToSend);
-			//	nwStream.Write(data, 0, data.Length);				
-			//}
-			//catch (Exception ex)
-			//{
-			//	Console.WriteLine(ex.ToString());
-			//}
-		}
+            try
+            {
+                _sender = _sender ?? new TcpClient(ipAddress, portNumber);
+                NetworkStream nwStream = _sender.GetStream();
+                var data = Encoding.UTF8.GetBytes(ValueToSend);
+                nwStream.Write(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
 	}
 }

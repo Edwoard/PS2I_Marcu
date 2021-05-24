@@ -77,7 +77,7 @@ namespace Simulator
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var enumValue = (MixState)value;
-            if (enumValue != MixState.CouterClockwise)
+            if (enumValue != MixState.CounterClockwise)
             {
                 return Visibility.Hidden;
             }

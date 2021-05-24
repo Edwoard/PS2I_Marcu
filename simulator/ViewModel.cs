@@ -13,13 +13,13 @@ using System.Windows.Media;
 
 namespace Simulator
 {
-    public enum State {  Stopped, On, Off }
-    public enum MixState { Stopped, Clockwise, CouterClockwise }
+    public enum State { Stopped, On, OnLedOff }
+    public enum MixState { Stopped, Clockwise, CounterClockwise }
     public record ProcessState
     {
         public State H1Manual { get; init; }
-        public State H2Substrace { get; init; }
-        public State H3Catalist { get; init; }
+        public State H2Substance { get; init; }
+        public State H3Catalyst { get; init; }
         public State H4InertGaz { get; init; }
         public State H5AutoMode { get; init; }
 
@@ -107,7 +107,7 @@ namespace Simulator
                 canExecuteHandler: () => 
                     this.ProcessState.IsNewtralised
                     && this.ProcessState.CoolantCircut == State.On 
-                    && this.ProcessState.H3Catalist == State.Stopped
+                    && this.ProcessState.H3Catalyst == State.Stopped
             );
             this.commands.Add(this.AddCatalistCommand);
 
@@ -117,31 +117,24 @@ namespace Simulator
                 canExecuteHandler: () =>
                     this.ProcessState.IsNewtralised
                     && this.ProcessState.CoolantCircut == State.On 
-                    && this.ProcessState.H2Substrace == State.Stopped
+                    && this.ProcessState.H2Substance == State.Stopped
             );
             this.commands.Add(this.AddSubstraceCommand);
         }
 
         ProcessState ResetProcessState()
         {
-            return this.ProcessState with
+            return new ProcessState
             {
-                CoolantCircut = State.Stopped,
-                H1Manual = State.Stopped,
-                H5AutoMode = State.Stopped,
-                MixState = MixState.Stopped,
-                H2Substrace = State.Stopped,
-                H3Catalist = State.Stopped,
-                ProductValve = State.Stopped,
-                H4InertGaz = State.Stopped,
-                IsNewtralised = false
+                DischargeRate = this.ProcessState.DischargeRate,
+                SupplyRate = this.ProcessState.SupplyRate,
             };
         }
         void AddCatalist()
         {
             this.ProcessState = this.ProcessState with
             {
-                H3Catalist = State.On
+                H3Catalyst = State.On
             };
         }
 
@@ -149,7 +142,7 @@ namespace Simulator
         {
             this.ProcessState = this.ProcessState with
             {
-                H2Substrace = State.On
+                H2Substance = State.On
             };
         }
         async Task AddInertGas(CancellationToken cancellationToken)
@@ -161,7 +154,7 @@ namespace Simulator
                 await Task.Delay(500);
 
                 cancellationToken.ThrowIfCancellationRequested();
-                this.ProcessState = this.ProcessState with { H4InertGaz = State.Off };
+                this.ProcessState = this.ProcessState with { H4InertGaz = State.OnLedOff };
                 await Task.Delay(500);
             }
 
@@ -231,7 +224,7 @@ namespace Simulator
                 cancellationToken.ThrowIfCancellationRequested();
                 this.ProcessState = this.ProcessState with
                 {
-                    MixState = MixState.CouterClockwise
+                    MixState = MixState.CounterClockwise
                 };
                 await Task.Delay(2000);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -245,6 +238,7 @@ namespace Simulator
 
             this.ProcessState = this.ProcessState with
             {
+                LPlus = false,
                 MixState = MixState.Stopped,
                 ProductValve = State.On
             };
@@ -267,6 +261,10 @@ namespace Simulator
             {
                 this.SetProperty(ref _currentStateOfTheProcess, value);
                 this.InvalidateCommands();
+                this.OnPropertyChanged(nameof(LPlus));
+                this.OnPropertyChanged(nameof(LMinus));
+                this.OnPropertyChanged(nameof(DischargeRate));
+                this.OnPropertyChanged(nameof(SupplyRate));
                 this._sender.Send(_currentStateOfTheProcess.ToString());
             }
         }
@@ -281,13 +279,13 @@ namespace Simulator
         public bool LPlus
         {
             get => this.ProcessState.LPlus;
-            set => this.ProcessState = this.ProcessState with { LPlus = value };
+            set => this.ProcessState = this.ProcessState with { LPlus = value, LMinus = false };
         }
 
         public bool LMinus
         {
             get => this.ProcessState.LMinus;
-            set => this.ProcessState = this.ProcessState with { LMinus = value };
+            set => this.ProcessState = this.ProcessState with { LMinus = value, LPlus = false };
         }
 
         public int DischargeRate
