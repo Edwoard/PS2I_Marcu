@@ -45,7 +45,7 @@ function App() {
   return (
     <div style={{ textAlign: "center" }}>
 
-      <div style={{ display: "grid", gridTemplate: "150px 300px 150px / 200px 200px 200px", width: 600 }}>
+      <div style={{ display: "grid", gridTemplate: "150px 300px 200px / 200px 200px 200px", width: 600 }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <h5>Inert Gas</h5>
           {response?.H4InertGaz === "On"?
@@ -69,7 +69,9 @@ function App() {
             width: 50, height: 50,
             backgroundColor: response?.LPlus ? 'red': 'unset',
             borderRadius: 25,
-            borderStyle: "solid", borderColor: 'black', borderWidth: 1
+            borderStyle: "solid", borderColor: 'black', borderWidth: 1,
+            display: "flex", justifyContent: "center", alignItems:"center",
+            fontWeight:"bold",
           }}>
             L+
           </div>
@@ -77,7 +79,10 @@ function App() {
             width: 50, height: 50,
             backgroundColor: response?.LMinus ? 'red': 'unset',
             borderRadius: 25,
-            borderStyle: "solid", borderColor: 'black', borderWidth: 1
+            display: "flex", justifyContent: "center", alignItems:"center",
+            verticalAlign: "center",
+            borderStyle: "solid", borderColor: 'black', borderWidth: 1,
+            fontWeight:"bold",
           }}>
             L-
           </div>
@@ -95,7 +100,7 @@ function App() {
                 height={200} style={{ marginTop: 20, alignSelf: "center" }}></img>}
         </div>
         <div>
-          <h5>Water</h5>
+          <h5>Water circut</h5>
           {response?.CoolantCircut !== "On"? undefined :
               <img src={water} width={150} style={{ marginLeft: -125 }}></img>}
         </div>
@@ -103,10 +108,10 @@ function App() {
         <div>
         </div>
         
-        <div style={{ zIndex: 20}}>
+        <div style={{ zIndex: 20, display: 'flex', justifyContent: "center",}}>
           {response?.ProductValve !== "On"? undefined :
             <img src={downArrow} style={{ marginTop: -20 }}></img>}
-          <h5>Evacuation</h5>
+          <h5 style={{ alignSelf: "flex-end"}}>Evacuation</h5>
         </div>
         <div></div>
       </div>
