@@ -9,8 +9,8 @@ import topLeftBottomRightArrow from './img/top-left-bottom-right-arrow.png'
 import topRightBottomLeftArrow from './img/top-right-bottom-left.png'
 import upArrow from './img/up-arrow.png'
 
-type State = "Stopped" | "On" | "OnLedOff"
-type MixState = "Stopped" | "Clockwise" | "CounterClockwise"
+type State = "Off" | "On"
+type MixState = "Off" | "Clockwise" | "CounterClockwise"
 interface ProcessState {
   H1Manual: State;
   H2Substance: State;
@@ -90,7 +90,7 @@ function App() {
           alignSelf: "stretch", zIndex: 10,
           borderColor: "black", borderWidth: 2, borderStyle: "solid", borderRadius: 25
         }}>
-          {!response || response.MixState === "Stopped"? undefined:
+          {!response || response.MixState === "Off"? undefined:
             <img src={response.MixState === "Clockwise" ? clockArrow: counterClockArrow} 
                 height={200} style={{ marginTop: 20, alignSelf: "center" }}></img>}
         </div>
